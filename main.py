@@ -6,8 +6,9 @@ app = Flask(__name__)
 app.config['AISusername'] = 'AISpassword'
 jwt = JWTManager(app)
 
+DATABASE_PATH = r"C:\Users\offic\Desktop\DiabetesAPI\health_data.db"
 # SQLite db setup
-conn = sqlite3.connect('health_data.db')
+conn = sqlite3.connect(DATABASE_PATH)
 cursor = conn.cursor()
 cursor.execute('''CREATE TABLE IF NOT EXISTS health_info (
                     id INTEGER PRIMARY KEY,
@@ -21,7 +22,6 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS health_info (
                     age INTEGER
                 )''')
 conn.commit()
-conn.close()
 
 # Authentication through JWT tokens
 @app.route('/login', methods=['POST'])
@@ -39,6 +39,27 @@ def login():
 def protected():
     current_user = get_jwt_identity()
     return jsonify(logged_in_as=current_user), 200
+
+app.route('/api/healthinfo', methods=['POST'])
+@jwt_required()
+def add_health_info():
+    current_user = get_jwt_identity()
+    data = request.json
+
+    required_fields = ['pregnancies', 'glucose', 'blood_pressure', 'skin_thickness', 'insulin', 'bmi', 'diabetes_pedigree_function', 'age']
+    if not all(field in data for field in required_fields):
+        return jsonify({"msg": "Missing required fields"}), 400
+    
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''INSERT INTO health_info (pregnancies, glucose, blood_pressure, skin_thickness, insulin, bmi, diabetes_pedigree_function, age)
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+                   (data['pregnancies'], data['glucose'], data['blood_pressure'], data['skin_thickness'], data['insulin'],
+                    data['bmi'], data['diabetes_pedigree_function'], data['age']))
+    conn.commit()
+    conn.close()
+
+    return jsonify({"msg": "Health information added"})
 
 if __name__ == "__main__":
     app.run()
